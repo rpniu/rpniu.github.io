@@ -1,4 +1,4 @@
-module github.com/rPniu/rPniu.github.io
+module github.com/rpniu/rpniu.github.io
 
 go 1.25.5
 
