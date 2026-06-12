@@ -1,5 +1,7 @@
 baseURL: https://rpniu.github.io/
 title: My Site
+defaultContentLanguage: zh-cn
+timeZone: Asia/Shanghai
 hasCJKLanguage: true
 enableGitInfo: true
 enableInlineShortcodes: true
@@ -22,13 +24,17 @@ menu:
     - identifier: more
       name: "更多"
       weight: 3
-    - identifier: "关于"
+    - identifier: about
       name: "关于"
       pageRef: /about
       parent: more
-    - identifier: "归档"
+    - identifier: archives
       name: "归档"
       pageRef: /archives
+      parent: more
+    - identifier: links
+      name: "友链"
+      pageRef: /links
       parent: more
     - name: 搜索
       weight: 4
@@ -57,6 +63,31 @@ params:
     width: wide
     contextMenu:
       enable: true
+  
+  archives:
+    section: ["blog", "docs"]
+    dateFormat: "Jan 02"
+
+  navigation:
+    breadcrumb: true   # 开启顶部面包屑导航（如：Docs > 技术设计 > API）
+    nextPrev: true     # 开启文章底部“上一篇/下一篇”导航
+  editURL:
+    enable: true
+    base: "https://github.com/rpniu/rpniu.github.io/edit/main/content"
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+
+  highlight:
+    lineNos: true          # 开启代码块的行号
+    lineNumbersInTable: true # 解决行号复制时的排版错位问题
+    style: "github-dark"   # 设置代码高亮主题（可选 monokai, dracula, solarized-dark 等）
+  
+  tableOfContents:
+    startLevel: 2          # 自动生成的目录从 H2 (##) 开始提取
+    endLevel: 4            # 提取到 H4 (####) 结束
 
 outputs:
   page: [html, markdown]

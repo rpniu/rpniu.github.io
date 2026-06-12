@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moment Code Clock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap');
+        
+        :root {
+            --bg-color: #f8fafc;
+            --bg-gradient-1: #e2e8f0;
+            --bg-gradient-2: #f1f5f9;
+            
+            --panel-bg: rgba(255, 255, 255, 0.7);
+            --panel-border: rgba(255, 255, 255, 0.5);
+            --panel-shadow: rgba(15, 23, 42, 0.05);
+            
+            --text-primary: #334155;
+            --text-keyword: #0284c7; /* Sky 600 */
+            --text-key: #0f172a;     /* Slate 900 */
+            --text-string: #16a34a;  /* Green 600 */
+            --text-number: #d97706;  /* Amber 600 */
+            --text-punct: #64748b;   /* Slate 500 */
+
+            --clock-border: rgba(148, 163, 184, 0.3);
+            --clock-bg: rgba(255, 255, 255, 0.4);
+            --clock-shadow: rgba(2, 132, 199, 0.15);
+            --clock-inner-shadow: rgba(255, 255, 255, 0.8);
+            
+            --hand-main: #334155;
+            --hand-sec: #ef4444;     /* Red 500 */
+        }
+
+        html.dark {
+            --bg-color: #0f172a;
+            --bg-gradient-1: #020617;
+            --bg-gradient-2: #1e293b;
+            
+            --panel-bg: rgba(15, 23, 42, 0.6);
+            --panel-border: rgba(51, 65, 85, 0.6);
+            --panel-shadow: rgba(0, 0, 0, 0.4);
+
+            --text-primary: #f8fafc;
+            --text-keyword: #38bdf8; /* Sky 400 */
+            --text-key: #e2e8f0;     /* Slate 200 */
+            --text-string: #4ade80;  /* Green 400 */
+            --text-number: #fbbf24;  /* Amber 400 */
+            --text-punct: #94a3b8;   /* Slate 400 */
+
+            --clock-border: rgba(51, 65, 85, 0.6);
+            --clock-bg: rgba(15, 23, 42, 0.4);
+            --clock-shadow: rgba(56, 189, 248, 0.15);
+            --clock-inner-shadow: rgba(255, 255, 255, 0.05);
+            
+            --hand-main: #e2e8f0;
+            --hand-sec: #f87171;     /* Red 400 */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: radial-gradient(at top left, var(--bg-gradient-1), transparent 70%),
+                              radial-gradient(at bottom right, var(--bg-gradient-2), transparent 70%);
+            color: var(--text-primary);
+            font-family: 'Fira Code', monospace;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 模拟代码字体的平滑渲染 */
+        .ide-window {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 20px 40px -10px var(--panel-shadow), 0 0 20px var(--clock-shadow);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 1.25rem;
+            padding: 1.5rem 2rem 2rem;
+            transition: all 0.5s ease;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .window-controls div {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .code-block {
+            font-size: clamp(0.9rem, 1.8vw, 1.5rem);
+            line-height: 1.9;
+            font-weight: 500;
+            letter-spacing: -0.02em;
+        }
+        
+        .code-block span {
+            transition: color 0.4s ease;
+        }
+
+        .key { color: var(--text-key); }
+        .keyword { color: var(--text-keyword); font-style: italic; }
+        .string { color: var(--text-string); }
+        .number { color: var(--text-number); }
+        .punct { color: var(--text-punct); }
+
+        /* 时钟发光效果 */
+        .clock-container {
+            width: clamp(180px, 25vw, 300px);
+            aspect-ratio: 1 / 1;
+            border-radius: 50%;
+            border: 1px solid var(--clock-border);
+            position: relative;
+            background: var(--clock-bg);
+            box-shadow: 0 0 60px var(--clock-shadow), inset 0 2px 20px var(--clock-inner-shadow), 0 20px 40px var(--panel-shadow);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            transition: all 0.5s ease;
+        }
+
+        /* 时钟刻度 (通过 JS 生成) */
+        .clock-marker {
+            position: absolute;
+            width: 2px;
+            height: 6px;
+            background: var(--text-punct);
+            left: 50%;
+            top: 4px;
+            transform-origin: 50% 146px; /* 根据实际尺寸近似，会在JS中动态设置 */
+            opacity: 0.5;
+            margin-left: -1px;
+        }
+        .clock-marker.main {
+            height: 10px;
+            width: 3px;
+            opacity: 0.8;
+            margin-left: -1.5px;
+            background: var(--text-key);
+        }
+
+        /* 时钟指针通用样式 */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            border-radius: 9999px;
+            z-index: 10;
+            transition: background-color 0.4s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .hour-hand {
+            width: 6px;
+            height: 25%;
+            background-color: var(--hand-main);
+            margin-left: -3px;
+        }
+
+        .minute-hand {
+            width: 4px;
+            height: 38%;
+            background-color: var(--hand-main);
+            margin-left: -2px;
+        }
+
+        .second-hand {
+            width: 2px;
+            height: 44%;
+            background-color: var(--hand-sec);
+            margin-left: -1px;
+        }
+
+        /* 中心点 */
+        .center-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 14px;
+            height: 14px;
+            background-color: var(--bg-color);
+            border: 3px solid var(--hand-sec);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.4s ease;
+        }
+        
+        /* 模式切换按钮悬停效果 */
+        #theme-toggle {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 4px 6px -1px var(--panel-shadow), 0 2px 4px -1px var(--panel-shadow);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-primary);
+        }
+        #theme-toggle:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px -5px var(--clock-shadow), 0 8px 10px -6px var(--panel-shadow);
+            border-color: var(--text-keyword);
+            color: var(--text-keyword);
+        }
+        #theme-toggle:active {
+            transform: translateY(1px) scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 模式切换按钮 -->
+    <button id="theme-toggle" class="absolute top-8 right-8 w-12 h-12 flex items-center justify-center rounded-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-sky-500/30 z-50 group" aria-label="Toggle Dark Mode">
+        <!-- 太阳图标 (暗黑模式下隐藏) -->
+        <svg id="theme-toggle-light-icon" class="w-6 h-6 hidden dark:block transition-transform duration-500 group-hover:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+        <!-- 月亮图标 (白天模式下隐藏) -->
+        <svg id="theme-toggle-dark-icon" class="w-6 h-6 block dark:hidden transition-transform duration-500 group-hover:-rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+        </svg>
+    </button>
+
+    <main class="flex flex-col lg:flex-row items-center justify-center gap-16 lg:gap-32 w-full max-w-6xl p-8">
+        
+        <!-- 左侧代码块 (模拟 IDE 窗口) -->
+        <div class="ide-window">
+            <div class="window-controls">
+                <div style="background-color: #ff5f56;"></div>
+                <div style="background-color: #ffbd2e;"></div>
+                <div style="background-color: #27c93f;"></div>
+            </div>
+            <div class="code-block whitespace-nowrap">
+                <div><span class="keyword">const</span> <span class="key">currentTime</span> <span class="punct">= {</span></div>
+                <div class="pl-8"><span class="key">year</span><span class="punct">:</span> <span id="v-year" class="number">2026</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">month</span><span class="punct">:</span> <span id="v-month" class="number">05</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">day</span><span class="punct">:</span> <span id="v-day" class="number">06</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">dayOfWeek</span><span class="punct">:</span> <span id="v-dow" class="string">"Wednesday"</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">hour</span><span class="punct">:</span> <span id="v-hour" class="number">17</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">minute</span><span class="punct">:</span> <span id="v-minute" class="number">38</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">second</span><span class="punct">:</span> <span id="v-second" class="number">25</span><span class="punct">,</span></div>
+                <div class="pl-8"><span class="key">dayProgress</span><span class="punct">:</span> <span id="v-progress" class="number">73.50%</span></div>
+                <div><span class="punct">};</span></div>
+            </div>
+        </div>
+
+        <!-- 右侧模拟时钟 -->
+        <div class="clock-container relative flex-shrink-0" id="clock-face">
+            <div id="hour-hand" class="hand hour-hand"></div>
+            <div id="minute-hand" class="hand minute-hand"></div>
+            <div id="second-hand" class="hand second-hand"></div>
+            <div class="center-dot"></div>
+        </div>
+
+    </main>
+
+    <script>
+        // 生成时钟刻度
+        const clockFace = document.getElementById('clock-face');
+        const setMarkers = () => {
+            // 移除旧刻度
+            document.querySelectorAll('.clock-marker').forEach(e => e.remove());
+            const radius = clockFace.clientWidth / 2;
+            for (let i = 0; i < 60; i++) {
+                const marker = document.createElement('div');
+                marker.className = `clock-marker ${i % 5 === 0 ? 'main' : ''}`;
+                marker.style.transform = `translateX(-50%) rotate(${i * 6}deg)`;
+                marker.style.transformOrigin = `50% ${radius - 4}px`;
+                clockFace.appendChild(marker);
+            }
+        };
+        
+        // 初始和拉伸时重绘刻度
+        window.addEventListener('resize', setMarkers);
+        // 使用 setTimeout 确保 DOM 渲染完后能拿到宽度
+        setTimeout(setMarkers, 50);
+
+        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        
+        const padZero = (num) => num.toString().padStart(2, '0');
+
+        function updateClock() {
+            const now = new Date();
+            
+            // 时间拆解
+            const year = now.getFullYear();
+            const month = padZero(now.getMonth() + 1);
+            const day = padZero(now.getDate());
+            const dow = days[now.getDay()];
+            const hour = padZero(now.getHours());
+            const minute = padZero(now.getMinutes());
+            const second = padZero(now.getSeconds());
+            
+            // 进度计算 (当前秒数 / 一天的总秒数)
+            const totalSecondsInDay = 24 * 60 * 60;
+            const currentSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+            const progress = ((currentSeconds / totalSecondsInDay) * 100).toFixed(2);
+
+            // 更新代码块文本
+            document.getElementById('v-year').textContent = year;
+            document.getElementById('v-month').textContent = month;
+            document.getElementById('v-day').textContent = day;
+            document.getElementById('v-dow').textContent = `"${dow}"`;
+            document.getElementById('v-hour').textContent = hour;
+            document.getElementById('v-minute').textContent = minute;
+            document.getElementById('v-second').textContent = second;
+            document.getElementById('v-progress').textContent = `${progress}%`;
+
+            // 更新模拟时钟指针角度
+            const ms = now.getMilliseconds();
+            
+            // 包含毫秒实现平滑过渡
+            const secAngle = (now.getSeconds() + ms / 1000) * 6;
+            const minAngle = (now.getMinutes() + now.getSeconds() / 60) * 6;
+            const hourAngle = ((now.getHours() % 12) + now.getMinutes() / 60) * 30;
+
+            document.getElementById('second-hand').style.transform = `translateX(-50%) rotate(${secAngle}deg)`;
+            document.getElementById('minute-hand').style.transform = `translateX(-50%) rotate(${minAngle}deg)`;
+            document.getElementById('hour-hand').style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
+
+            requestAnimationFrame(updateClock);
+        }
+
+        // 初始化运行
+        requestAnimationFrame(updateClock);
+
+        // 主题切换逻辑
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        
+        // 检查本地存储或系统偏好
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            // 切换 class
+            document.documentElement.classList.toggle('dark');
+            
+            // 保存偏好到 localStorage
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.setItem('color-theme', 'dark');
+            } else {
+                localStorage.setItem('color-theme', 'light');
+            }
+        });
+    </script>
+</body>
+</html>
